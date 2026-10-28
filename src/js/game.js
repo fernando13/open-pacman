@@ -1,6 +1,6 @@
 // game.js
 // Estado y reglas. Depende de globals de maze.js: MAZE, TUNNEL_ROW,
-// PACMAN_START, GHOST_STARTS.
+// PACMAN_START, GHOST_STARTS, POWER_PELLETS.
 
 const DIRS = {
   left: { x: -1, y: 0 },
@@ -12,6 +12,13 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+
+// Power pellets y modo asustado.
+const POWER_PELLET_POINTS = 50;
+const FRIGHTENED_FRAMES = 360;        // 6 s a 60 fps
+const FRIGHTENED_FLASH_FRAMES = 60;   // ultimo segundo: parpadeo
+const FRIGHTENED_SPEED = 0.05;        // mitad de GHOST_SPEED
+const GHOST_EAT_POINTS = [ 200, 400, 800, 1600 ];
 
 // Retrasos escalonados de salida del pen, en frames (0 = sale de inmediato).
 const GHOST_EXIT_TIMERS = [ 0, 60, 120, 180 ];
@@ -30,8 +37,12 @@ function createGame() {
     state: 'start',
     score: 0,
     lives: 3,
-    dotsRemaining: dots,
+    // Los pellets tambien son comida: la victoria exige comer los 4.
+    dotsRemaining: dots + POWER_PELLETS.length,
     grid,
+    powerPellets: POWER_PELLETS.map( ( p ) => ( { x: p.x, y: p.y, eaten: false } ) ),
+    frightened: 0,     // frames restantes de modo asustado (0 = inactivo)
+    ghostsEaten: 0,    // fantasmas comidos con el pellet actual
     pacman: {
       x: PACMAN_START.x,
       y: PACMAN_START.y,
@@ -47,6 +58,7 @@ function createGame() {
       kind: g.kind,
       inPen: true, // empieza dentro del cuarto
       exitTimer: GHOST_EXIT_TIMERS[ i ] || 0,
+      reverse: false, // pide girar 180 en la proxima celda alineada
     } ) ),
   };
 }
@@ -113,6 +125,20 @@ function movePacman( game ) {
       game.score += 10;
       game.dotsRemaining--;
     }
+    // Comer power pellet: activa el susto y pide giro de 180 a los fantasmas.
+    const pellet = game.powerPellets.find(
+      ( pp ) => !pp.eaten && pp.x === p.x && pp.y === p.y
+    );
+    if ( pellet ) {
+      pellet.eaten = true;
+      game.score += POWER_PELLET_POINTS;
+      game.dotsRemaining--;
+      game.frightened = FRIGHTENED_FRAMES;
+      game.ghostsEaten = 0;
+      game.ghosts.forEach( ( g ) => {
+        g.reverse = true;
+      } );
+    }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
   }
@@ -132,6 +158,12 @@ function decideGhost( game, g ) {
   );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ OPPOSITE[ g.dir ] ];
+
+  // Asustado fuera del pen: deambula al azar, sin objetivo.
+  if ( game.frightened > 0 && !g.inPen ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
 
   const px = Math.round( p.x );
   const py = Math.round( p.y );
@@ -209,6 +241,14 @@ function moveGhost( game, g ) {
         decideGhost( game, g );
       }
       if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+    } else if ( g.reverse ) {
+      // Giro de 180 pedido por el pellet: se consume en la primera celda
+      // alineada y solo si esa direccion es transitable. No se llama a
+      // decideGhost para que el fantasma siga de verdad en sentido contrario.
+      g.reverse = false;
+      const back = OPPOSITE[ g.dir ];
+      if ( canMove( grid, g.x, g.y, back, 'ghost' ) ) g.dir = back;
+      if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
     } else {
       decideGhost( game, g );
       if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
@@ -216,8 +256,11 @@ function moveGhost( game, g ) {
   }
 
   const d = DIRS[ g.dir ];
-  g.x += d.x * g.speed;
-  g.y += d.y * g.speed;
+  // Durante el susto se mueven a mitad de velocidad, pero el pen conserva
+  // su ruta y velocidad normales para poder salir.
+  const speed = game.frightened > 0 && !g.inPen ? FRIGHTENED_SPEED : GHOST_SPEED;
+  g.x += d.x * speed;
+  g.y += d.y * speed;
   wrapTunnel( g, width );
 }
 
@@ -227,12 +270,17 @@ function resetPositions( game ) {
   p.y = PACMAN_START.y;
   p.dir = 'left';
   p.nextDir = null;
+  // Tras perder una vida se limpian el susto y el combo; los pellets ya
+  // comidos siguen comidos.
+  game.frightened = 0;
+  game.ghostsEaten = 0;
   game.ghosts.forEach( ( g, i ) => {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
     g.inPen = true;
     g.exitTimer = GHOST_EXIT_TIMERS[ i ] || 0;
+    g.reverse = false;
   } );
 }
 
@@ -248,8 +296,27 @@ function update( game ) {
   } );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
+  // El susto dura FRIGHTENED_FRAMES; al agotarse se limpia el combo.
+  if ( game.frightened > 0 ) {
+    game.frightened--;
+    if ( game.frightened === 0 ) game.ghostsEaten = 0;
+  }
+
   for ( const g of game.ghosts ) {
     if ( collides( game.pacman, g ) ) {
+      // Fantasma asustado: se lo come y vuelve al pen al instante.
+      if ( game.frightened > 0 ) {
+        game.score += GHOST_EAT_POINTS[ Math.min( game.ghostsEaten, 3 ) ];
+        game.ghostsEaten++;
+        const start = GHOST_STARTS.find( ( s ) => s.kind === g.kind );
+        g.x = start.x;
+        g.y = start.y;
+        g.dir = 'up';
+        g.inPen = true;
+        g.exitTimer = 0;
+        g.reverse = false;
+        continue;
+      }
       game.lives--;
       if ( game.lives <= 0 ) {
         game.state = 'lost';
@@ -266,3 +333,5 @@ function update( game ) {
 window.createGame = createGame;
 window.update = update;
 window.DIRS = DIRS;
+// Umbral de parpadeo compartido con render.js (no duplicar el numero).
+window.FRIGHTENED_FLASH_FRAMES = FRIGHTENED_FLASH_FRAMES;
