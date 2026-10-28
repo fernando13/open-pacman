@@ -75,6 +75,11 @@ function canMove( grid, x, y, dir, actor ) {
   const ty = y + d.y;
   // Tunel: salir por un borde en la fila del tunel siempre es valido.
   if ( ty === TUNNEL_ROW && ( tx < 0 || tx >= grid[ 0 ].length ) ) return true;
+  // La puerta del pen solo se cruza hacia arriba: los fantasmas salen, no entran.
+  if ( actor === 'ghost' && dir === 'down' ) {
+    const inBounds = ty >= 0 && ty < grid.length && tx >= 0 && tx < grid[ 0 ].length;
+    if ( inBounds && grid[ ty ][ tx ] === 3 ) return false;
+  }
   return !isWall( grid, tx, ty, actor );
 }
 
