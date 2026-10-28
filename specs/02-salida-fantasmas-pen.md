@@ -1,6 +1,6 @@
 # SPEC 02: Salida de los fantasmas del pen con puerta de un solo sentido
 
-**Estado:** Aprobado  
+**Estado:** Implementado  
 **Fecha:** 2026-10-27  
 **Dependencias:** SPEC 01  
 **Objetivo:** Impedir que los fantasmas vuelvan a entrar al pen después de salir, manteniendo la salida escalonada actual.
