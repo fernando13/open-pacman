@@ -9,7 +9,7 @@ const MAZE_STR = [
   '############################', // 0  borde
   '#............##............#', // 1
   '#.####.#####.##.#####.####.#', // 2
-  '#.####.#####.##.#####.####.#', // 3
+  '# ####.#####.##.#####.#### #', // 3  power pellets en las esquinas
   '#.####.#####.##.#####.####.#', // 4
   '#..........................#', // 5
   '#.####.##.########.##.####.#', // 6
@@ -29,7 +29,7 @@ const MAZE_STR = [
   '#............##............#', // 20
   '#.####.#####.##.#####.####.#', // 21
   '#.####.#####.##.#####.####.#', // 22
-  '#...##................##...#', // 23  fila inicio Pacman (13,23)
+  '# ..##................##.. #', // 23  fila inicio Pacman (13,23) + pellets
   '###.##.##.########.##.##.###', // 24
   '###.##.##.########.##.##.###', // 25
   '#......##....##....##......#', // 26
@@ -58,7 +58,18 @@ const GHOST_STARTS = [
   { x: 15, y: 14, kind: 'clyde'  }, // naranja - vagabundo
 ];
 
+// Power pellets: las 4 esquinas del nivel 1.
+// No son tiles: el grid solo guarda geometria y dots; el estado "comido"
+// vive en game.powerPellets.
+const POWER_PELLETS = [
+  { x: 1,  y: 3 },
+  { x: 26, y: 3 },
+  { x: 1,  y: 23 },
+  { x: 26, y: 23 },
+];
+
 window.MAZE = MAZE;
 window.TUNNEL_ROW = TUNNEL_ROW;
 window.PACMAN_START = PACMAN_START;
 window.GHOST_STARTS = GHOST_STARTS;
+window.POWER_PELLETS = POWER_PELLETS;

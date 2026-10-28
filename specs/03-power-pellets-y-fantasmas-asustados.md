@@ -1,6 +1,6 @@
 # SPEC 03: Power pellets y fantasmas asustados
 
-**Estado:** Aprobado  
+**Estado:** Implementado  
 **Fecha:** 2026-10-27  
 **Dependencias:** SPEC 01, SPEC 02  
 **Objetivo:** Añadir 4 power pellets que otorgan 50 puntos y activan 6 segundos de fantasmas asustados, comestibles con puntuación escalonada.
