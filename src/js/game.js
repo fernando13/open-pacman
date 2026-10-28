@@ -75,6 +75,14 @@ function canMove( grid, x, y, dir, actor ) {
   const ty = y + d.y;
   // Tunel: salir por un borde en la fila del tunel siempre es valido.
   if ( ty === TUNNEL_ROW && ( tx < 0 || tx >= grid[ 0 ].length ) ) return true;
+  // Puerta del pen de un solo sentido: los fantasmas la cruzan hacia arriba
+  // para salir, pero no pueden bajar por el tile 3 para volver a entrar.
+  // El reingreso del futuro modo ojos necesitara su propio spec y condicionar
+  // esta regla (por ejemplo, permitir bajar solo si el fantasma va comido).
+  if ( actor === 'ghost' && dir === 'down' ) {
+    const inBounds = ty >= 0 && ty < grid.length && tx >= 0 && tx < grid[ 0 ].length;
+    if ( inBounds && grid[ ty ][ tx ] === 3 ) return false;
+  }
   return !isWall( grid, tx, ty, actor );
 }
 
